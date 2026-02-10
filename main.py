@@ -1,13 +1,8 @@
 import os
-import asyncio
 import logging
 from aiogram import Bot, Dispatcher
-from aiogram.filters import Command
-from aiogram.types import Message
-from dotenv import load_dotenv
-
-# Загрузка переменных окружения
-load_dotenv()
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
+from aiohttp import web
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -17,8 +12,8 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
-# Выбор демо-режима (subscription | info | content)
-DEMO_MODE = "content"  # Измени эту переменную для переключения ботов
+# === ВЫБОР РЕЖИМА БОТА (МЕНЯТЬ ЗДЕСЬ!) ===
+DEMO_MODE = "subscription"  # "subscription" | "info" | "content"
 
 # Загрузка выбранного бота
 if DEMO_MODE == "subscription":
@@ -28,49 +23,66 @@ if DEMO_MODE == "subscription":
     bot_name = "Бот подписок"
 
 elif DEMO_MODE == "info":
-    # Будет добавлено позже
-    bot_name = "Инфо-бот с партнёрками"
     from bots.info_bot import setup_info_bot
 
     setup_info_bot(dp)
+    bot_name = "Инфо-бот с партнёрками"
 
 elif DEMO_MODE == "content":
-    # Будет добавлено позже
-    bot_name = "Контент-завод"
     from bots.content_bot import setup_content_bot
 
     setup_content_bot(dp)
+    bot_name = "Контент-завод"
 
 else:
     bot_name = "Неизвестный режим"
 
-
-# Общая команда для всех режимов
-@dp.message(Command("mode"))
-async def show_mode(message: Message):
-    """Показать текущий режим бота"""
-    await message.answer(f"🔧 Текущий режим: {bot_name}\n\n"
-                         f"Для смены режима измените переменную DEMO_MODE в main.py")
+logger.info(f"🚀 Загружен режим: {bot_name}")
 
 
-@dp.message(Command("help"))
-async def cmd_help(message: Message):
-    """Помощь"""
-    await message.answer(
-        f"🤖 **{bot_name}**\n\n"
-        "Доступные команды:\n"
-        "/start - Начать работу с ботом\n"
-        "/help - Эта справка\n"
-        "/mode - Показать текущий режим\n\n"
-        "Используйте кнопки меню для навигации."
+# === ВЕБХУКИ И HEALTH CHECK ===
+async def health_check(request):
+    """Простой health check для Uptime Robot"""
+    return web.Response(text=f"OK - {bot_name}")
+
+
+async def on_startup(app):
+    """Действия при запуске бота"""
+    webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook"
+    await bot.set_webhook(webhook_url)
+    logger.info(f"Webhook установлен: {webhook_url}")
+
+
+async def on_shutdown(app):
+    """Действия при остановке бота"""
+    await bot.delete_webhook()
+    logger.info("Бот остановлен")
+
+
+def main():
+    """Основная функция запуска"""
+    app = web.Application()
+
+    # Регистрируем health check
+    app.router.add_get("/", health_check)
+    app.router.add_get("/health", health_check)
+
+    # Регистрируем вебхук для бота
+    webhook_handler = SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
     )
+    webhook_handler.register(app, path="/webhook")
 
+    # События запуска/остановки
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
 
-async def main():
-    """Главная функция"""
-    logger.info(f"Бот запущен в режиме: {bot_name}")
-    await dp.start_polling(bot)
+    # Запускаем сервер
+    port = int(os.getenv("PORT", 8080))
+    logger.info(f"Запуск сервера на порту {port}")
+    web.run_app(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
