@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio: Telegram Bot Developer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 0; text-align: center; }
+        h1 { font-size: 2.8rem; margin-bottom: 10px; }
+        .subtitle { font-size: 1.2rem; opacity: 0.9; }
+        section { padding: 60px 0; }
+        h2 { font-size: 2rem; margin-bottom: 30px; text-align: center; }
+        .projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+        .project-card { border: 1px solid #eaeaea; border-radius: 10px; padding: 25px; transition: transform 0.3s, box-shadow 0.3s; }
+        .project-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .project-icon { font-size: 2.5rem; margin-bottom: 15px; }
+        .project-card h3 { font-size: 1.3rem; margin-bottom: 10px; }
+        .features { list-style: none; margin: 15px 0; }
+        .features li { padding: 5px 0; }
+        .features li:before { content: "✓ "; color: #4CAF50; }
+        .btn { display: inline-block; background: #667eea; color: white; padding: 12px 25px; border-radius: 5px; text-decoration: none; font-weight: 500; transition: background 0.3s; }
+        .btn:hover { background: #5a67d8; }
+        .tech-stack { background: #f8f9fa; padding: 40px 0; }
+        .tech-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px; }
+        .tech-item { background: white; padding: 10px 20px; border-radius: 20px; border: 1px solid #eaeaea; }
+        footer { background: #333; color: white; text-align: center; padding: 30px 0; margin-top: 60px; }
+        .telegram-btn { background: #0088cc; }
+        .telegram-btn:hover { background: #0077b5; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Telegram Bot Developer</h1>
+            <p class="subtitle">Профессиональная разработка автоматизированных решений для бизнеса</p>
+        </div>
+    </header>
+
+    <section class="container">
+        <h2>🚀 Демо-боты в портфолио</h2>
+        <div class="projects">
+            <div class="project-card">
+                <div class="project-icon">🤖</div>
+                <h3>Бот подписок</h3>
+                <p>Полный цикл продажи подписок: регистрация, trial период, оплата, выдача доступа, поддержка.</p>
+                <ul class="features">
+                    <li>Пробный период 3 дня</li>
+                    <li>Интеграция с платёжными системами</li>
+                    <li>Автоматическая выдача конфигураций</li>
+                    <li>Админ-панель для управления</li>
+                </ul>
+                <a href="https://t.me/your_bot_username" class="btn telegram-btn">Протестировать в Telegram</a>
+            </div>
+
+            <div class="project-card">
+                <div class="project-icon">🛒</div>
+                <h3>Инфо-бот с партнёрками</h3>
+                <p>Рекомендательная система с партнёрскими ссылками. Подбор товаров по параметрам.</p>
+                <ul class="features">
+                    <li>Интеллектуальный подбор</li>
+                    <li>Интеграция с Ozon/Wildberries</li>
+                    <li>Панель аналитики кликов</li>
+                    <li>Автоматическое обновление ассортимента</li>
+                </ul>
+                <a href="https://t.me/your_bot_username" class="btn telegram-btn">Протестировать в Telegram</a>
+            </div>
+
+            <div class="project-card">
+                <div class="project-icon">📝</div>
+                <h3>Контент-завод</h3>
+                <p>Генерация контента для соцсетей через AI. Шаблоны, адаптация под разные платформы.</p>
+                <ul class="features">
+                    <li>Интеграция с ChatGPT API</li>
+                    <li>Шаблоны для 5+ платформ</li>
+                    <li>История генераций</li>
+                    <li>Экспорт в разные форматы</li>
+                </ul>
+                <a href="https://t.me/your_bot_username" class="btn telegram-btn">Протестировать в Telegram</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="tech-stack">
+        <div class="container">
+            <h2>🛠 Технологический стек</h2>
+            <div class="tech-list">
+                <div class="tech-item">Python 3.11+</div>
+                <div class="tech-item">Aiogram 3.x</div>
+                <div class="tech-item">PostgreSQL/SQLite</div>
+                <div class="tech-item">REST API</div>
+                <div class="tech-item">Docker</div>
+                <div class="tech-item">Redis</div>
+                <div class="tech-item">Webhooks</div>
+                <div class="tech-item">OpenAI API</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="container">
+        <h2>📈 Что я могу для вас сделать</h2>
+        <div style="max-width: 800px; margin: 0 auto;">
+            <div style="background: #f8f9fa; padding: 30px; border-radius: 10px; margin-top: 20px;">
+                <h3 style="margin-bottom: 20px;">Типовые задачи, которые я решаю:</h3>
+                <ul class="features" style="columns: 2;">
+                    <li>Telegram-боты для продаж и автоматизации</li>
+                    <li>Интеграция с платёжными системами</li>
+                    <li>Парсинг и анализ данных</li>
+                    <li>Интеграция с CRM и API</li>
+                    <li>Чат-боты с искусственным интеллектом</li>
+                    <li>Боты для техподдержки</li>
+                    <li>Автоматизация контент-процессов</li>
+                    <li>Микросервисная архитектура</li>
+                </ul>
+            </div>
+            <div style="text-align: center; margin-top: 40px;">
+                <a href="https://t.me/your_username" class="btn" style="font-size: 1.1rem; padding: 15px 40px;">
+                    💬 Обсудить проект
+                </a>
+                <p style="margin-top: 15px; color: #666;">
+                    Средний срок разработки MVP: 3-7 дней
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>© 2026 Telegram Bot Developer. Все права защищены.</p>
+            <p style="margin-top: 10px; opacity: 0.8;">
+                GitHub: <a href="https://github.com/fnv4135-prog" style="color: white;">fnv4135-prog</a> |
+                Telegram: <a href="https://t.me/your_username" style="color: white;">@your_username</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>
