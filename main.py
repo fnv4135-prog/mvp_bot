@@ -117,7 +117,27 @@ async def mode_handler(callback: CallbackQuery):
         return
 
     # Сохраняем выбранный режим
-    user_modes[user_id] = mode
+    from core.db_manager import db_manager
+
+    # Удаляем старый словарь user_modes и используем БД
+
+    @dp.callback_query(F.data.startswith("mode_"))
+    async def mode_handler(callback: CallbackQuery):
+        """Обработчик выбора режима с записью в БД"""
+        user_id = callback.from_user.id
+        username = callback.from_user.username or ""
+        mode = callback.data.replace("mode_", "")
+
+        # Сохраняем в БД
+        db_manager.set_user_mode(user_id, username, mode)
+
+        # Логируем действие
+        db_manager.log_action(
+            user_id=user_id,
+            action_type="mode_switch",
+            bot_mode=mode,
+            details=f"Переключение на {mode}"
+        )
 
     # 🔔 Отправляем всплывающее уведомление
     await callback.answer(
