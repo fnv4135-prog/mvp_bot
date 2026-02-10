@@ -18,7 +18,7 @@ bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
 # Выбор демо-режима (subscription | info | content)
-DEMO_MODE = "subscription"  # Измени эту переменную для переключения ботов
+DEMO_MODE = "content"  # Измени эту переменную для переключения ботов
 
 # Загрузка выбранного бота
 if DEMO_MODE == "subscription":
