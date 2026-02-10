@@ -5,6 +5,8 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command, CommandStart
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiohttp import web
+from core.analytics import analytics
+
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -35,6 +37,16 @@ def get_mode_keyboard() -> InlineKeyboardMarkup:
 async def cmd_start(message: Message):
     """Главное меню с выбором режима"""
     user_id = message.from_user.id
+    username = message.from_user.username or ""
+
+    # Логируем старт
+    analytics.log_event(
+        user_id=user_id,
+        username=username,
+        action="start",
+        bot_mode="dispatcher",
+        details="Пользователь начал работу"
+    )
 
     # По умолчанию - бот подписок
     if user_id not in user_modes:

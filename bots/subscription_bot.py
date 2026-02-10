@@ -1,8 +1,10 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command, CommandStart
+from core.analytics import analytics
 from datetime import datetime
 import logging
+
 
 from core.database import db
 
@@ -78,6 +80,15 @@ async def main_menu_handler(callback: CallbackQuery):
 async def trial_handler(callback: CallbackQuery):
     """Выдача trial периода"""
     user_id = callback.from_user.id
+    username = callback.from_user.username or ""
+
+    analytics.log_event(
+        user_id=user_id,
+        username=username,
+        action="get_trial",
+        bot_mode="subscription",
+        details="Запрошен пробный период"
+    )
     user = db.get_user(user_id)
 
     if not user:
