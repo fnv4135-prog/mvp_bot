@@ -250,3 +250,13 @@ def setup_subscription_bot(dp):
     """Настройка бота подписок"""
     dp.include_router(router)
     print("✅ Subscription bot setup complete")
+
+
+async def show_main_menu(message):
+    """Показывает главное меню бота подписок"""
+    keyboard = get_main_menu()  # Используем существующую функцию
+    await message.answer(
+        "🤖 **Бот подписок**\n\n"
+        "Выберите действие в меню ниже:",
+        reply_markup=keyboard
+    )
