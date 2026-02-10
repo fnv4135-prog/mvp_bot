@@ -198,7 +198,10 @@ FAKE_CERTIFICATE_FOR_DEMO_ONLY
         f"📄 **Ваша конфигурация:**\n\n"
         f"```\n{fake_config}\n```\n\n"
         "Скопируйте этот текст в файл config.ovpn",
-        parse_mode="Markdown"
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Назад к статусу", callback_data="my_access")]
+        ])
     )
 
     await callback.answer("Конфигурация отправлена в чат")
@@ -212,10 +215,17 @@ async def support_handler(callback: CallbackQuery):
         "Если у вас возникли проблемы:\n\n"
         "1. Опишите проблему в этом чате\n"
         "2. Администратор ответит в течение 24 часов\n"
-        "3. Для срочных вопросов: @admin_support\n\n"
+        "3. Для срочных вопросов: @NicholasBiz\n\n"
         "Напишите ваш вопрос ниже:",
         reply_markup=get_back_to_menu()
     )
+
+
+def get_back_to_menu() -> InlineKeyboardMarkup:
+    """Кнопка назад в меню"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад в меню", callback_data="main_menu")]
+    ])
 
 
 @router.callback_query(F.data == "about")
