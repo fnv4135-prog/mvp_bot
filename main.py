@@ -103,62 +103,34 @@ async def cmd_help(message: Message):
 # === ОБРАБОТЧИКИ ВЫБОРА РЕЖИМА ===
 @dp.callback_query(F.data.startswith("mode_"))
 async def mode_handler(callback: CallbackQuery):
-    """Обработчик выбора режима"""
+    """Обработчик выбора режима (с БД и логированием)"""
     user_id = callback.from_user.id
+    username = callback.from_user.username or ""
     mode = callback.data.replace("mode_", "")
 
+    # Сохраняем в БД (если db_manager работает)
+    try:
+        from core.db_manager import db_manager
+        db_manager.set_user_mode(user_id, username, mode)
+        db_manager.log_action(user_id, "mode_switch", mode, f"Переключение на {mode}")
+    except Exception as e:
+        logger.error(f"Ошибка БД: {e}")
+
+    # Уведомление
     mode_names = {
         "subscription": "🤖 Бот подписок",
-        "info": "🛒 Инфо-бот с партнёрками",
+        "info": "🛒 Инфо-бот",
         "content": "📝 Контент-завод",
         "about": "ℹ️ О портфолио"
     }
+    await callback.answer(f"✅ Переключено на {mode_names.get(mode, mode)}", show_alert=True)
 
     if mode == "about":
-        await callback.message.edit_text(
-            "🎯 **Портфолио Telegram-ботов**\n\n"
-            "Это демонстрационный проект, показывающий различные типы Telegram-ботов:\n\n"
-            "• **Бот подписок** - полный цикл продаж (trial, оплата, выдача доступа)\n"
-            "• **Инфо-бот** - рекомендательная система с партнёрскими ссылками\n"
-            "• **Контент-завод** - генерация контента с помощью AI\n\n"
-            "**Технологии:** Python, aiogram, aiohttp, вебхуки\n"
-            "**Хостинг:** Render + Uptime Robot\n\n"
-            "Все боты полностью рабочие и готовы к интеграции в реальные проекты.",
-            reply_markup=get_mode_keyboard()
-        )
+        await callback.message.edit_text(..., reply_markup=get_mode_keyboard())
         return
 
-    # Сохраняем выбранный режим
-    from core.db_manager import db_manager
-
-    # Удаляем старый словарь user_modes и используем БД
-
-    @dp.callback_query(F.data.startswith("mode_"))
-    async def mode_handler(callback: CallbackQuery):
-        """Обработчик выбора режима с записью в БД"""
-        user_id = callback.from_user.id
-        username = callback.from_user.username or ""
-        mode = callback.data.replace("mode_", "")
-
-        # Сохраняем в БД
-        db_manager.set_user_mode(user_id, username, mode)
-
-        # Логируем действие
-        db_manager.log_action(
-            user_id=user_id,
-            action_type="mode_switch",
-            bot_mode=mode,
-            details=f"Переключение на {mode}"
-        )
-
-    # 🔔 Отправляем всплывающее уведомление
-    await callback.answer(
-        f"✅ Переключено на {mode_names[mode]}",
-        show_alert=True
-    )
-
-    # Загружаем соответствующий бот
-    await load_bot_mode(callback, mode, mode_names[mode])
+    # Загружаем выбранный бот
+    await load_bot_mode(callback, mode, mode_names.get(mode))
 
 
 async def load_bot_mode(callback: CallbackQuery, mode: str, mode_name: str):

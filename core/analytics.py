@@ -15,6 +15,21 @@ class GoogleSheetsAnalytics:
         self.init_connection()
 
     def init_connection(self):
+        # ОТЛАДКА
+        import os
+        print("=" * 50)
+        print("DEBUG: Проверка переменных окружения")
+        print("RENDER_EXTERNAL_HOSTNAME:", os.getenv("RENDER_EXTERNAL_HOSTNAME"))
+        print("GOOGLE_SHEETS_CREDENTIALS_JSON exists:", "GOOGLE_SHEETS_CREDENTIALS_JSON" in os.environ)
+
+        if "GOOGLE_SHEETS_CREDENTIALS_JSON" in os.environ:
+            value = os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON")
+            print("Length of JSON:", len(value) if value else 0)
+            print("First 100 chars:", value[:100] if value else "None")
+
+        print("=" * 50)
+
+    def init_connection(self):
         """Инициализация подключения к Google Sheets"""
         try:
             # Сначала пробуем получить JSON из переменной окружения
