@@ -73,18 +73,6 @@ def get_budget_keyboard(goal: str):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-@router.message(CommandStart())
-async def cmd_start(message: Message):
-    """Начало работы с инфо-ботом"""
-    await message.answer(
-        "🛒 **Подбор оборудования**\n\n"
-        "Я помогу подобрать технику по вашим потребностям и бюджету.\n"
-        "Все рекомендации содержат партнёрские ссылки на проверенные магазины.\n\n"
-        "**Для начала выберите основную цель использования:**",
-        reply_markup=get_start_keyboard()
-    )
-
-
 @router.callback_query(F.data.startswith("goal_"))
 async def goal_handler(callback: CallbackQuery):
     """Обработчик выбора цели"""

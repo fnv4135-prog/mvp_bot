@@ -14,8 +14,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-DEFAULT_SPREADSHEET_ID = "1acJjGdELWRm9urc1q2dDy5OymQ2fN2K-q9njTHpcO-Q"  # твоя таблица
-WORKSHEET_NAME = "Лог событий"  # можно изменить
+DEFAULT_SPREADSHEET_ID = "1acJjGdELWRm9urc1q2dDy5OymQ2fN2K-q9njTHpcO-Q"
+WORKSHEET_NAME = "Лог событий"
 
 
 class GoogleSheetsAnalytics:
@@ -27,18 +27,16 @@ class GoogleSheetsAnalytics:
         self._init_connection()
 
     def _init_connection(self):
-        """Инициализация подключения к Google Sheets с приоритетом переменных окружения."""
-        # --- 1. Получаем credentials ---
+        """Инициализация подключения с поддержкой разных имён переменных."""
+        # --- 1. Получаем credentials из нескольких возможных переменных ---
         creds_json = None
-
-        # Проверяем разные имена переменных (для совместимости)
         for env_var in ["GOOGLE_CREDENTIALS", "GOOGLE_SHEETS_CREDENTIALS_JSON"]:
             creds_json = os.getenv(env_var)
             if creds_json:
                 logger.info(f"✅ Используем переменную окружения {env_var}")
                 break
 
-        # Если нет переменной, пробуем файл
+        # Если переменной нет — пробуем файл
         if not creds_json:
             creds_file = "gsheets_credentials.json"
             if os.path.exists(creds_file):
@@ -53,9 +51,8 @@ class GoogleSheetsAnalytics:
                 self.sheet = None
                 return
 
-        # --- 2. Парсим JSON (восстанавливаем переносы строк) ---
+        # --- 2. Парсим JSON (восстанавливаем переносы) ---
         try:
-            # Заменяем экранированные \n на реальные переносы
             if "\\n" in creds_json:
                 creds_json = creds_json.replace("\\n", "\n")
             creds_dict = json.loads(creds_json)
@@ -84,11 +81,9 @@ class GoogleSheetsAnalytics:
         try:
             spreadsheet = client.open_by_key(self.spreadsheet_id)
 
-            # Пытаемся получить существующий лист
             try:
                 self.sheet = spreadsheet.worksheet(WORKSHEET_NAME)
             except gspread.WorksheetNotFound:
-                # Создаём новый лист с заголовками
                 self.sheet = spreadsheet.add_worksheet(
                     title=WORKSHEET_NAME,
                     rows=1000,
@@ -97,7 +92,6 @@ class GoogleSheetsAnalytics:
                 self._ensure_headers()
                 logger.info(f"✅ Создан новый лист '{WORKSHEET_NAME}'")
 
-            # Проверяем заголовки (на случай, если лист существовал, но без них)
             self._ensure_headers()
             logger.info("✅ Подключение к Google Sheets установлено")
 
@@ -106,33 +100,23 @@ class GoogleSheetsAnalytics:
             self.sheet = None
 
     def _ensure_headers(self):
-        """Проверяет и при необходимости создаёт заголовки в первой строке."""
+        """Проверяет и создаёт заголовки."""
         if not self.sheet:
             return
-
         try:
             headers = self.sheet.row_values(1)
-            expected_headers = [
-                "Timestamp", "User ID", "Username", "Action",
-                "Bot Mode", "Details", "Source", "Session ID"
-            ]
-
-            # Если заголовков нет или они не совпадают — перезаписываем
-            if not headers or headers[0] != expected_headers[0]:
-                self.sheet.insert_row(expected_headers, index=1)
+            expected = ["Timestamp", "User ID", "Username", "Action",
+                        "Bot Mode", "Details", "Source", "Session ID"]
+            if not headers or headers[0] != expected[0]:
+                self.sheet.insert_row(expected, index=1)
                 logger.info("✅ Заголовки таблицы обновлены")
         except Exception as e:
-            logger.error(f"❌ Ошибка проверки заголовков: {e}")
+            logger.error(f"❌ Ошибка заголовков: {e}")
 
     def log_event(self, user_id: int, username: str = "", action: str = "",
                   bot_mode: str = "", details: str = "", source: str = "telegram_bot") -> bool:
-        """
-        Записывает событие в Google Sheets.
-
-        Возвращает True при успехе, False при ошибке или отсутствии подключения.
-        """
+        """Запись события в Google Sheets."""
         if not self.sheet:
-            # Резервное логирование в консоль
             logger.info(f"[ANALYTICS] {user_id} | {action} | {bot_mode} | {details}")
             return False
 
@@ -151,30 +135,22 @@ class GoogleSheetsAnalytics:
                 source,
                 session_id
             ]
-
-            # Асинхронность: gspread синхронный, но для небольшой нагрузки сойдёт.
-            # Если бот разрастётся, оберни в asyncio.to_thread()
             self.sheet.append_row(row, value_input_option="USER_ENTERED")
-
             logger.debug(f"✅ Записано в Google Sheets: {action} для {user_id}")
             return True
-
         except Exception as e:
-            logger.error(f"❌ Ошибка записи в Google Sheets: {e}")
-            # Не отключаем sheet полностью, чтобы следующие попытки могли пройти
+            logger.error(f"❌ Ошибка записи: {e}")
             return False
 
     def test_connection(self) -> bool:
-        """Проверка доступности таблицы (читать первую ячейку)."""
+        """Проверка соединения (быстрый запрос)."""
         if not self.sheet:
             return False
         try:
-            self.sheet.acell("A1")  # быстрый запрос
+            self.sheet.acell("A1")
             return True
-        except Exception as e:
-            logger.error(f"❌ Ошибка проверки соединения: {e}")
+        except:
             return False
 
 
-# Глобальный экземпляр для импорта в других модулях
 analytics = GoogleSheetsAnalytics()

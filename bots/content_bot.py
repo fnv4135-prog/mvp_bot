@@ -151,22 +151,6 @@ Reels, Shorts, TikTok - эти платформы определяют прав�
     return examples["telegram"]
 
 
-@router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
-    """Начало работы с контент-ботом"""
-    await state.clear()
-    await message.answer(
-        "📝 **Контент-завод**\n\n"
-        "Я помогаю создавать контент для социальных сетей и блогов.\n\n"
-        "Что я умею:\n"
-        "• Генерировать посты для разных платформ\n"
-        "• Предлагать шаблоны и идеи\n"
-        "• Адаптировать стиль под вашу аудиторию\n\n"
-        "Выберите действие:",
-        reply_markup=get_start_keyboard()
-    )
-
-
 @router.callback_query(F.data == "generate_post")
 async def start_generation(callback: CallbackQuery, state: FSMContext):
     """Начало генерации поста"""

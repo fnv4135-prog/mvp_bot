@@ -100,67 +100,55 @@ async def cmd_help(message: Message):
     )
 
 
-# === ОБРАБОТЧИКИ ВЫБОРА РЕЖИМА ===
 @dp.callback_query(F.data.startswith("mode_"))
 async def mode_handler(callback: CallbackQuery):
-    """Обработчик выбора режима (с БД и логированием)"""
     user_id = callback.from_user.id
     username = callback.from_user.username or ""
     mode = callback.data.replace("mode_", "")
 
-    # Сохраняем в БД (если db_manager работает)
+    # Сохраняем режим (в БД или user_modes)
     try:
         from core.db_manager import db_manager
         db_manager.set_user_mode(user_id, username, mode)
-        db_manager.log_action(user_id, "mode_switch", mode, f"Переключение на {mode}")
-    except Exception as e:
-        logger.error(f"Ошибка БД: {e}")
+    except:
+        user_modes[user_id] = mode   # fallback
 
-    # Уведомление
-    mode_names = {
-        "subscription": "🤖 Бот подписок",
-        "info": "🛒 Инфо-бот",
-        "content": "📝 Контент-завод",
-        "about": "ℹ️ О портфолио"
-    }
+    mode_names = {...}  # твой словарь
     await callback.answer(f"✅ Переключено на {mode_names.get(mode, mode)}", show_alert=True)
 
     if mode == "about":
-        await callback.message.edit_text(..., reply_markup=get_mode_keyboard())
+        # текст о портфолио
+        await callback.message.edit_text("🎯 **Портфолио Telegram-ботов**...", reply_markup=get_mode_keyboard())
         return
 
-    # Загружаем выбранный бот
-    await load_bot_mode(callback, mode, mode_names.get(mode))
+    # Запускаем стартовое меню выбранного бота
+    if mode == "subscription":
+        from bots.subscription_bot import show_main_menu
+        await show_main_menu(callback.message)
+    elif mode == "info":
+        from bots.info_bot import show_start_menu
+        await show_start_menu(callback.message)
+    elif mode == "content":
+        from bots.content_bot import show_start_menu as show_content_menu
+        await show_content_menu(callback.message)
+
+    await callback.message.delete()
 
 
 async def load_bot_mode(callback: CallbackQuery, mode: str, mode_name: str):
     """Динамическая загрузка выбранного бота"""
 
     if mode == "subscription":
-        # Очищаем предыдущие хэндлеры
-        from bots.subscription_bot import router as subscription_router
-        # Удаляем старые хэндлеры (упрощенный способ - перезагружаем диспетчер)
-        # Вместо этого просто вызываем команду /start для выбранного бота
-
-        # 🔥 Прямой запуск бота подписок
         from bots.subscription_bot import show_main_menu
         await show_main_menu(callback.message)
         await callback.message.delete()  # Удаляем старое сообщение с выбором режима
 
     elif mode == "info":
-        from bots.info_bot import router as info_router
-        dp.include_router(info_router)
-
-        # 🔥 Прямой запуск инфо-бота
         from bots.info_bot import show_start_menu
         await show_start_menu(callback.message)
         await callback.message.delete()
 
     elif mode == "content":
-        from bots.content_bot import router as content_router
-        dp.include_router(content_router)
-
-        # 🔥 Прямой запуск контент-бота
         from bots.content_bot import show_start_menu as show_content_menu
         await show_content_menu(callback.message)
         await callback.message.delete()
@@ -172,22 +160,30 @@ async def health_check(request):
     return web.Response(text="✅ Портфолио ботов работает")
 
 
+# === ПОДКЛЮЧЕНИЕ ВСЕХ РОУТЕРОВ ОДИН РАЗ ===
+from bots.subscription_bot import router as subscription_router
+from bots.info_bot import router as info_router
+from bots.content_bot import router as content_router
+
+dp.include_router(subscription_router)
+dp.include_router(info_router)
+dp.include_router(content_router)
+
+
+# Теперь в on_startup НЕ НУЖНО подключать роутеры
 async def on_startup(app):
-    """Действия при запуске"""
     webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook"
     await bot.set_webhook(webhook_url)
     logger.info(f"Webhook установлен: {webhook_url}")
 
-    # По умолчанию загружаем бота подписок
-    from bots.subscription_bot import router as subscription_router
-    dp.include_router(subscription_router)
-    logger.info("✅ Загружен бот подписок по умолчанию")
+    # Проверка Google Sheets (не блокирует запуск)
+    if analytics.test_connection():
+        logger.info("✅ Google Sheets доступна")
+    else:
+        logger.warning("⚠️ Google Sheets не отвечает")
 
-
-async def on_shutdown(app):
-    """Действия при остановке"""
-    await bot.delete_webhook()
-    logger.info("Бот остановлен")
+    # Запускаем self-ping (см. ниже)
+    asyncio.create_task(self_ping())
 
 
 def main():

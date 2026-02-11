@@ -40,33 +40,6 @@ def get_payment_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-# Обработчики команд
-@router.message(CommandStart())
-async def cmd_start(message: Message):
-    """Обработчик команды /start"""
-    user_id = message.from_user.id
-
-    # Создаем пользователя если его нет
-    if not db.get_user(user_id):
-        db.create_user(user_id, message.from_user.username)
-        await message.answer(
-            "👋 Добро пожаловать!\n"
-            "Я бот для управления подписками на сетевой сервис.\n\n"
-            "Что я умею:\n"
-            "• Выдать пробный период на 3 дня\n"
-            "• Продать подписку на 1 месяц\n"
-            "• Показать статус вашего доступа\n"
-            "• Ответить на вопросы\n\n"
-            "Выберите действие в меню ниже:",
-            reply_markup=get_main_menu()
-        )
-    else:
-        await message.answer(
-            "С возвращением! Что вы хотите сделать?",
-            reply_markup=get_main_menu()
-        )
-
-
 @router.callback_query(F.data == "main_menu")
 async def main_menu_handler(callback: CallbackQuery):
     """Возврат в главное меню"""
