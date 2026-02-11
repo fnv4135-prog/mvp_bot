@@ -27,16 +27,29 @@ class GoogleSheetsAnalytics:
         self._init_connection()
 
     def _init_connection(self):
-        """Инициализация подключения с поддержкой разных имён переменных."""
-        # --- 1. Получаем credentials из нескольких возможных переменных ---
+        """Инициализация подключения с поддержкой base64 или JSON."""
         creds_json = None
-        for env_var in ["GOOGLE_CREDENTIALS", "GOOGLE_SHEETS_CREDENTIALS_JSON"]:
-            creds_json = os.getenv(env_var)
-            if creds_json:
-                logger.info(f"✅ Используем переменную окружения {env_var}")
-                break
 
-        # Если переменной нет — пробуем файл
+        # 1. Пробуем base64
+        creds_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+        if creds_b64:
+            try:
+                import base64
+                json_str = base64.b64decode(creds_b64).decode()
+                creds_json = json_str
+                logger.info("✅ Используем GOOGLE_CREDENTIALS_BASE64")
+            except Exception as e:
+                logger.error(f"❌ Ошибка декодирования base64: {e}")
+
+        # 2. Если нет base64 — пробуем обычную переменную
+        if not creds_json:
+            for env_var in ["GOOGLE_CREDENTIALS", "GOOGLE_SHEETS_CREDENTIALS_JSON"]:
+                creds_json = os.getenv(env_var)
+                if creds_json:
+                    logger.info(f"✅ Используем переменную окружения {env_var}")
+                    break
+
+        # 3. Если ничего нет — пробуем файл (но после блокировки GitHub не рекомендуется)
         if not creds_json:
             creds_file = "gsheets_credentials.json"
             if os.path.exists(creds_file):
@@ -51,8 +64,9 @@ class GoogleSheetsAnalytics:
                 self.sheet = None
                 return
 
-        # --- 2. Парсим JSON (восстанавливаем переносы) ---
+        # --- Далее без изменений: парсим JSON, авторизация, открытие таблицы ---
         try:
+            # Восстанавливаем переносы строк, если они были экранированы
             if "\\n" in creds_json:
                 creds_json = creds_json.replace("\\n", "\n")
             creds_dict = json.loads(creds_json)
@@ -61,43 +75,6 @@ class GoogleSheetsAnalytics:
             self.sheet = None
             return
 
-        # --- 3. Авторизация ---
-        try:
-            creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-            client = gspread.authorize(creds)
-        except Exception as e:
-            logger.error(f"❌ Ошибка авторизации: {e}")
-            self.sheet = None
-            return
-
-        # --- 4. ID таблицы ---
-        self.spreadsheet_id = os.getenv("GOOGLE_SHEET_ID", DEFAULT_SPREADSHEET_ID)
-        if not self.spreadsheet_id:
-            logger.error("❌ Не указан GOOGLE_SHEET_ID")
-            self.sheet = None
-            return
-
-        # --- 5. Открываем таблицу и лист ---
-        try:
-            spreadsheet = client.open_by_key(self.spreadsheet_id)
-
-            try:
-                self.sheet = spreadsheet.worksheet(WORKSHEET_NAME)
-            except gspread.WorksheetNotFound:
-                self.sheet = spreadsheet.add_worksheet(
-                    title=WORKSHEET_NAME,
-                    rows=1000,
-                    cols=20
-                )
-                self._ensure_headers()
-                logger.info(f"✅ Создан новый лист '{WORKSHEET_NAME}'")
-
-            self._ensure_headers()
-            logger.info("✅ Подключение к Google Sheets установлено")
-
-        except Exception as e:
-            logger.error(f"❌ Ошибка открытия таблицы: {e}")
-            self.sheet = None
 
     def _ensure_headers(self):
         """Проверяет и создаёт заголовки."""
@@ -141,6 +118,7 @@ class GoogleSheetsAnalytics:
         except Exception as e:
             logger.error(f"❌ Ошибка записи: {e}")
             return False
+
 
     def test_connection(self) -> bool:
         """Проверка соединения (быстрый запрос)."""
