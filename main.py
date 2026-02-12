@@ -174,23 +174,37 @@ async def health_check(request):
     """Health check для мониторинга"""
     return web.Response(text="✅ Портфолио ботов работает")
 
+
 async def on_startup(app):
-    """Действия при запуске"""
-    # 1. Удаляем старый вебхук, сбрасываем накопившиеся апдейты
+    # 1. Генерируем секретный токен (случайная строка)
+    import secrets
+    secret_token = secrets.token_urlsafe(32)
+    os.environ["WEBHOOK_SECRET"] = secret_token  # сохраним для логов
+
+    # 2. Удаляем старый вебхук со сбросом апдейтов
     await bot.delete_webhook(drop_pending_updates=True)
-    logger.info("✅ Старый вебхук удалён, ожидающие апдейты сброшены")
+    logger.info("✅ Старый вебхук удалён, апдейты сброшены")
 
-    # 2. Устанавливаем новый вебхук
+    # 3. Устанавливаем новый с секретным токеном
     webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook"
-    await bot.set_webhook(webhook_url)
+    await bot.set_webhook(
+        url=webhook_url,
+        secret_token=secret_token,
+        drop_pending_updates=True,
+        max_connections=40
+    )
     logger.info(f"✅ Webhook установлен: {webhook_url}")
+    logger.info(f"🔐 Secret token: {secret_token[:10]}... (усечён)")
 
-    # 3. Диагностика вебхука
+    # 4. Подробная диагностика
     webhook_info = await bot.get_webhook_info()
     logger.info(f"📡 Webhook URL: {webhook_info.url}")
-    logger.info(f"📊 Pending updates: {webhook_info.pending_update_count}")
-    if webhook_info.last_error_date:
-        logger.error(f"❌ Last webhook error: {webhook_info.last_error_message}")
+    logger.info(f"🔒 Has secret token: {'да' if webhook_info.secret_token else 'нет'}")
+    logger.info(f"📦 Pending updates: {webhook_info.pending_update_count}")
+    logger.info(f"🕒 Last error date: {webhook_info.last_error_date}")
+    logger.info(f"❌ Last error message: {webhook_info.last_error_message}")
+    logger.info(f"🔗 Max connections: {webhook_info.max_connections}")
+    logger.info(f"📋 Allowed updates: {webhook_info.allowed_updates}")
 
     # 4. Проверка переменной Google (опционально)
     b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
