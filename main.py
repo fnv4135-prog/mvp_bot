@@ -8,11 +8,11 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command, CommandStart
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiohttp import web
-from core.analytics import analytics
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+from core.analytics import analytics
 
 # Инициализация
 bot = Bot(token=os.getenv("BOT_TOKEN"))
