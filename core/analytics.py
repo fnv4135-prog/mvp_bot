@@ -66,9 +66,7 @@ class GoogleSheetsAnalytics:
 
         # --- Далее без изменений: парсим JSON, авторизация, открытие таблицы ---
         try:
-            # Восстанавливаем переносы строк, если они были экранированы
-            if "\\n" in creds_json:
-                creds_json = creds_json.replace("\\n", "\n")
+            # Никаких replace("\\n", "\n") — JSON сам разберёт экранирование!
             creds_dict = json.loads(creds_json)
         except json.JSONDecodeError as e:
             logger.error(f"❌ Ошибка парсинга JSON: {e}")
