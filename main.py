@@ -144,16 +144,21 @@ async def mode_handler(callback: CallbackQuery):
 
 # === SELF-PING ДЛЯ ПРЕДОТВРАЩЕНИЯ СНА RENDER ===
 async def self_ping():
-    """Держит контейнер активным (пинг каждые 4 минуты)"""
-    url = "https://mvp-4hpg.onrender.com/health"
+    """Держит контейнер активным — пинг ВСЕХ важных эндпоинтов"""
+    urls = [
+        "https://mvp-4hpg.onrender.com/",
+        "https://mvp-4hpg.onrender.com/health",
+        "https://mvp-4hpg.onrender.com/webhook"
+    ]
     async with aiohttp.ClientSession() as session:
         while True:
-            await asyncio.sleep(240)
-            try:
-                await session.get(url)
-                logger.debug("Self-ping: контейнер активен")
-            except Exception as e:
-                logger.error(f"Self-ping error: {e}")
+            for url in urls:
+                try:
+                    await session.get(url, timeout=5)
+                    logger.debug(f"Self-ping: {url}")
+                except Exception as e:
+                    logger.error(f"Self-ping error for {url}: {e}")
+            await asyncio.sleep(240)  # 4 минуты между циклами
 
 # === ПОДКЛЮЧЕНИЕ ВСЕХ РОУТЕРОВ ОДИН РАЗ ===
 from bots.subscription_bot import router as subscription_router
@@ -171,10 +176,23 @@ async def health_check(request):
 
 async def on_startup(app):
     """Действия при запуске"""
+    # 1. Удаляем старый вебхук, сбрасываем накопившиеся апдейты
+    await bot.delete_webhook(drop_pending_updates=True)
+    logger.info("✅ Старый вебхук удалён, ожидающие апдейты сброшены")
+
+    # 2. Устанавливаем новый вебхук
     webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook"
     await bot.set_webhook(webhook_url)
-    logger.info(f"Webhook установлен: {webhook_url}")
+    logger.info(f"✅ Webhook установлен: {webhook_url}")
 
+    # 3. Диагностика вебхука
+    webhook_info = await bot.get_webhook_info()
+    logger.info(f"📡 Webhook URL: {webhook_info.url}")
+    logger.info(f"📊 Pending updates: {webhook_info.pending_update_count}")
+    if webhook_info.last_error_date:
+        logger.error(f"❌ Last webhook error: {webhook_info.last_error_message}")
+
+    # 4. Проверка переменной Google (опционально)
     b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
     if b64:
         logger.info(f"✅ GOOGLE_CREDENTIALS_BASE64 найдена, длина={len(b64)}")
@@ -183,8 +201,10 @@ async def on_startup(app):
     else:
         logger.error("❌ GOOGLE_CREDENTIALS_BASE64 НЕ НАЙДЕНА!")
 
-    # Запускаем self-ping в фоне
+    # 5. Запускаем self-ping (у тебя уже определена выше)
     asyncio.create_task(self_ping())
+    logger.info("🔄 Self-ping запущен")
+
 
 async def on_shutdown(app):
     """Действия при остановке"""
