@@ -1,15 +1,14 @@
 import os
 import json
+import base64
 import logging
 from datetime import datetime
-from typing import Optional
 
 import gspread
 from google.oauth2.service_account import Credentials
 
 logger = logging.getLogger(__name__)
 
-# Константы
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -19,60 +18,118 @@ WORKSHEET_NAME = "Лог событий"
 
 
 class GoogleSheetsAnalytics:
-    """Клиент для отправки событий в Google Sheets."""
-
     def __init__(self):
         self.sheet = None
         self.spreadsheet_id = None
         self._init_connection()
 
     def _init_connection(self):
-        print("🔥 _init_connection ВЫЗВАН", flush=True)  # <- ЭТО
+        """Инициализация подключения с детальными отпечатками."""
+        print("🔥🔥🔥 _init_connection ВЫЗВАН 🔥🔥🔥", flush=True)
+        logger.info("🚦 НАЧАЛО _init_connection")
         creds_json = None
 
-        # 1. Пробуем base64
+        # ----- 1. Пробуем base64 -----
+        logger.info("🔍 Шаг 1: ищем GOOGLE_CREDENTIALS_BASE64")
         creds_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
         if creds_b64:
             try:
-                import base64
                 json_str = base64.b64decode(creds_b64).decode()
                 creds_json = json_str
-                logger.info("✅ Используем GOOGLE_CREDENTIALS_BASE64")
+                logger.info("✅ Шаг 1.1: base64 декодирован, длина JSON %s", len(creds_json))
             except Exception as e:
-                logger.error(f"❌ Ошибка декодирования base64: {e}")
+                logger.error(f"❌ Шаг 1.1: ошибка декодирования base64: {e}")
+        else:
+            logger.warning("⚠️ Шаг 1: GOOGLE_CREDENTIALS_BASE64 не найдена")
 
-        # 2. Если нет base64 — пробуем обычную переменную
+        # ----- 2. Альтернативные способы (если нет base64) -----
         if not creds_json:
+            logger.info("🔍 Шаг 2: пробуем другие переменные")
             for env_var in ["GOOGLE_CREDENTIALS", "GOOGLE_SHEETS_CREDENTIALS_JSON"]:
                 creds_json = os.getenv(env_var)
                 if creds_json:
-                    logger.info(f"✅ Используем переменную окружения {env_var}")
+                    logger.info(f"✅ Шаг 2.1: найдена переменная {env_var}")
                     break
 
-        # 3. Если ничего нет — пробуем файл (но после блокировки GitHub не рекомендуется)
+        # ----- 3. Файл (локально) -----
         if not creds_json:
+            logger.info("🔍 Шаг 3: пробуем файл gsheets_credentials.json")
             creds_file = "gsheets_credentials.json"
             if os.path.exists(creds_file):
                 try:
                     with open(creds_file, "r") as f:
                         creds_json = f.read()
-                    logger.info("✅ Используем файл gsheets_credentials.json")
+                    logger.info("✅ Шаг 3.1: файл прочитан")
                 except Exception as e:
-                    logger.error(f"❌ Ошибка чтения файла: {e}")
+                    logger.error(f"❌ Шаг 3.1: ошибка чтения файла: {e}")
             else:
-                logger.warning("❌ Нет данных для Google Sheets. Аналитика отключена.")
+                logger.warning("❌ Шаг 3: файл не найден, аналитика отключена")
                 self.sheet = None
                 return
 
-        # --- Далее без изменений: парсим JSON, авторизация, открытие таблицы ---
-        try:
-            # Никаких replace("\\n", "\n") — JSON сам разберёт экранирование!
-            creds_dict = json.loads(creds_json)
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Ошибка парсинга JSON: {e}")
+        if not creds_json:
+            logger.error("❌ Шаг: нет credentials, останов")
             self.sheet = None
             return
 
+        # ----- 4. Парсинг JSON -----
+        logger.info("🔍 Шаг 4: парсинг JSON")
+        try:
+            creds_dict = json.loads(creds_json)
+            logger.info("✅ Шаг 4.1: JSON успешно распарсен")
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Шаг 4.1: ошибка парсинга JSON: {e}")
+            self.sheet = None
+            return
+
+        # ----- 5. Авторизация -----
+        logger.info("🔍 Шаг 5: авторизация в Google")
+        try:
+            creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+            client = gspread.authorize(creds)
+            logger.info("✅ Шаг 5.1: авторизация успешна, client получен")
+        except Exception as e:
+            logger.error(f"❌ Шаг 5.1: ошибка авторизации: {e}")
+            self.sheet = None
+            return
+
+        # ----- 6. ID таблицы -----
+        logger.info("🔍 Шаг 6: получение ID таблицы")
+        self.spreadsheet_id = os.getenv("GOOGLE_SHEET_ID", DEFAULT_SPREADSHEET_ID)
+        logger.info(f"✅ Шаг 6.1: ID таблицы = {self.spreadsheet_id}")
+        if not self.spreadsheet_id:
+            logger.error("❌ Шаг 6.1: ID таблицы пустой")
+            self.sheet = None
+            return
+
+        # ----- 7. Открытие таблицы -----
+        logger.info("🔍 Шаг 7: открытие таблицы по ID")
+        try:
+            spreadsheet = client.open_by_key(self.spreadsheet_id)
+            logger.info("✅ Шаг 7.1: таблица открыта, имя = %s", spreadsheet.title)
+        except Exception as e:
+            logger.error(f"❌ Шаг 7.1: ошибка открытия таблицы: {e}")
+            self.sheet = None
+            return
+
+        # ----- 8. Получение/создание листа -----
+        logger.info("🔍 Шаг 8: получение листа %s", WORKSHEET_NAME)
+        try:
+            self.sheet = spreadsheet.worksheet(WORKSHEET_NAME)
+            logger.info("✅ Шаг 8.1: лист найден")
+        except gspread.WorksheetNotFound:
+            logger.info("🔍 Шаг 8.2: лист не найден, создаю новый")
+            self.sheet = spreadsheet.add_worksheet(title=WORKSHEET_NAME, rows=1000, cols=20)
+            self._ensure_headers()
+            logger.info("✅ Шаг 8.3: новый лист создан")
+
+        # ----- 9. Проверка/создание заголовков -----
+        self._ensure_headers()
+        logger.info("✅ Шаг 9: заголовки проверены/созданы")
+
+        # ----- 10. УСПЕХ -----
+        logger.info("🎉🎉🎉 ПОДКЛЮЧЕНИЕ К GOOGLE SHEETS УСТАНОВЛЕНО 🎉🎉🎉")
+        print("🎉 GOOGLE SHEETS ГОТОВА К РАБОТЕ 🎉", flush=True)
 
     def _ensure_headers(self):
         """Проверяет и создаёт заголовки."""
@@ -116,7 +173,6 @@ class GoogleSheetsAnalytics:
         except Exception as e:
             logger.error(f"❌ Ошибка записи: {e}")
             return False
-
 
     def test_connection(self) -> bool:
         """Проверка соединения (быстрый запрос)."""
