@@ -175,11 +175,13 @@ async def on_startup(app):
     await bot.set_webhook(webhook_url)
     logger.info(f"Webhook установлен: {webhook_url}")
 
-    # Проверка Google Sheets (не блокирует запуск)
-    if analytics.test_connection():
-        logger.info("✅ Google Sheets доступна")
+    b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+    if b64:
+        logger.info(f"✅ GOOGLE_CREDENTIALS_BASE64 найдена, длина={len(b64)}")
+        logger.info(f"Первые 20 символов: {b64[:20]}")
+        logger.info(f"Последние 20 символов: {b64[-20:]}")
     else:
-        logger.warning("⚠️ Google Sheets не отвечает")
+        logger.error("❌ GOOGLE_CREDENTIALS_BASE64 НЕ НАЙДЕНА!")
 
     # Запускаем self-ping в фоне
     asyncio.create_task(self_ping())
