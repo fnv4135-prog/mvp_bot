@@ -5,6 +5,7 @@
 
 👉 **Живое демо:** [@mvp_portfolio_bot](https://t.me/mvp_portfolio_bot)  
 👉 **Лендинг портфолио:** [fnv4135-prog.github.io/mvp](https://fnv4135-prog.github.io/mvp/)
+👉 **Видео Демо:** [YouTube](https://t.me/mvp_portfolio_bot)  
 
 ---
 
