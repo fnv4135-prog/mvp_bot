@@ -36,7 +36,7 @@ class GoogleSheetsAnalytics:
             try:
                 json_str = base64.b64decode(creds_b64).decode()
                 creds_json = json_str
-                logger.info("✅ Шаг 1.1: base64 декодирован, длина JSON %s", len(creds_json))
+                logger.info(f"✅ Шаг 1.1: base64 декодирован, длина JSON {len(creds_json)}")
             except Exception as e:
                 logger.error(f"❌ Шаг 1.1: ошибка декодирования base64: {e}")
         else:
@@ -106,14 +106,14 @@ class GoogleSheetsAnalytics:
         logger.info("🔍 Шаг 7: открытие таблицы по ID")
         try:
             spreadsheet = client.open_by_key(self.spreadsheet_id)
-            logger.info("✅ Шаг 7.1: таблица открыта, имя = %s", spreadsheet.title)
+            logger.info(f"✅ Шаг 7.1: таблица открыта, имя = {spreadsheet.title}")
         except Exception as e:
             logger.error(f"❌ Шаг 7.1: ошибка открытия таблицы: {e}")
             self.sheet = None
             return
 
         # ----- 8. Получение/создание листа -----
-        logger.info("🔍 Шаг 8: получение листа %s", WORKSHEET_NAME)
+        logger.info(f"🔍 Шаг 8: получение листа {WORKSHEET_NAME}")
         try:
             self.sheet = spreadsheet.worksheet(WORKSHEET_NAME)
             logger.info("✅ Шаг 8.1: лист найден")
@@ -145,12 +145,26 @@ class GoogleSheetsAnalytics:
         except Exception as e:
             logger.error(f"❌ Ошибка заголовков: {e}")
 
+    def ensure_connection(self):
+        """Если соединение потеряно, пробуем переподключиться."""
+        if not self.sheet:
+            logger.warning("⚠️ Соединение потеряно, пробую переподключиться...")
+            self._init_connection()
+        return self.sheet is not None
+
     def log_event(self, user_id: int, username: str = "", action: str = "",
                   bot_mode: str = "", details: str = "", source: str = "telegram_bot") -> bool:
         """Запись события в Google Sheets."""
+        # 🔍 ДИАГНОСТИКА
+        logger.info(f"🟡 log_event ВЫЗВАН: action={action}, user={user_id}, bot_mode={bot_mode}")
+        logger.info(f"🟡 Состояние self.sheet: {self.sheet is not None}")
+
+        # Если sheet нет, пытаемся переподключиться
         if not self.sheet:
-            logger.info(f"[ANALYTICS] {user_id} | {action} | {bot_mode} | {details}")
-            return False
+            self.ensure_connection()
+            if not self.sheet:
+                logger.info(f"[ANALYTICS] {user_id} | {action} | {bot_mode} | {details}")
+                return False
 
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -167,11 +181,15 @@ class GoogleSheetsAnalytics:
                 source,
                 session_id
             ]
+
+            # 🟢 Пробуем записать
             self.sheet.append_row(row, value_input_option="USER_ENTERED")
-            logger.debug(f"✅ Записано в Google Sheets: {action} для {user_id}")
+            logger.info(f"✅✅✅ ЗАПИСАНО В GOOGLE SHEETS: {row}")
             return True
+
         except Exception as e:
-            logger.error(f"❌ Ошибка записи: {e}")
+            logger.error(f"❌❌❌ ОШИБКА ЗАПИСИ В GOOGLE SHEETS: {e}")
+            # Не обнуляем self.sheet — возможно, ошибка временная
             return False
 
     def test_connection(self) -> bool:
@@ -181,7 +199,9 @@ class GoogleSheetsAnalytics:
         try:
             self.sheet.acell("A1")
             return True
-        except:
+        except Exception as e:
+            logger.error(f"❌ Ошибка проверки соединения: {e}")
+            self.sheet = None  # Сбрасываем, чтобы переподключиться позже
             return False
 
 
