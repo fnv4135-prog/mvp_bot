@@ -1,6 +1,7 @@
 import os
 import asyncio
 import aiohttp
+import secrets
 import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -20,6 +21,7 @@ dp = Dispatcher()
 # === ХРАНЕНИЕ ТЕКУЩЕГО РЕЖИМА ДЛЯ КАЖДОГО ПОЛЬЗОВАТЕЛЯ ===
 user_modes = {}  # {user_id: "subscription"/"info"/"content"}
 
+
 # === КЛАВИАТУРА ДЛЯ ВЫБОРА РЕЖИМА ===
 def get_mode_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для выбора режима бота"""
@@ -30,6 +32,7 @@ def get_mode_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="ℹ️ О портфолио", callback_data="mode_about")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 
 # === ГЛАВНЫЕ КОМАНДЫ ===
 @dp.message(CommandStart())
@@ -59,6 +62,7 @@ async def cmd_start(message: Message):
         reply_markup=get_mode_keyboard()
     )
 
+
 @dp.message(Command("mode"))
 async def cmd_mode(message: Message):
     """Смена режима бота"""
@@ -67,6 +71,7 @@ async def cmd_mode(message: Message):
         "Выберите, какой бот вы хотите использовать:",
         reply_markup=get_mode_keyboard()
     )
+
 
 @dp.message(Command("help"))
 async def cmd_help(message: Message):
@@ -92,6 +97,7 @@ async def cmd_help(message: Message):
         "3. В любой момент можете сменить режим командой /mode"
     )
 
+
 @dp.callback_query(F.data.startswith("mode_"))
 async def mode_handler(callback: CallbackQuery):
     """Обработчик выбора режима"""
@@ -99,7 +105,6 @@ async def mode_handler(callback: CallbackQuery):
     username = callback.from_user.username or ""
     mode = callback.data.replace("mode_", "")
 
-    # Сохраняем режим (сначала пытаемся в БД, иначе в user_modes)
     try:
         from core.db_manager import db_manager
         db_manager.set_user_mode(user_id, username, mode)
@@ -129,7 +134,6 @@ async def mode_handler(callback: CallbackQuery):
         )
         return
 
-    # Запускаем стартовое меню выбранного бота
     if mode == "subscription":
         from bots.subscription_bot import show_main_menu
         await show_main_menu(callback.message)
@@ -142,23 +146,41 @@ async def mode_handler(callback: CallbackQuery):
 
     await callback.message.delete()
 
-# === SELF-PING ДЛЯ ПРЕДОТВРАЩЕНИЯ СНА RENDER ===
-async def self_ping():
+
+# === SELF-PING (использует внешнюю сессию, без утечек) ===
+async def self_ping(session: aiohttp.ClientSession):
     """Держит контейнер активным — пинг ВСЕХ важных эндпоинтов"""
     urls = [
         "https://mvp-4hpg.onrender.com/",
         "https://mvp-4hpg.onrender.com/health",
         "https://mvp-4hpg.onrender.com/webhook"
     ]
-    async with aiohttp.ClientSession() as session:
-        while True:
-            for url in urls:
-                try:
-                    await session.get(url, timeout=5)
-                    logger.debug(f"Self-ping: {url}")
-                except Exception as e:
-                    logger.error(f"Self-ping error for {url}: {e}")
-            await asyncio.sleep(240)  # 4 минуты между циклами
+    while True:
+        for url in urls:
+            try:
+                await session.get(url, timeout=5)
+                logger.debug(f"Self-ping: {url}")
+            except Exception as e:
+                logger.error(f"Self-ping error for {url}: {e}")
+        await asyncio.sleep(240)  # 4 минуты
+
+
+# === WATCHDOG ДЛЯ ВЕБХУКА ===
+async def webhook_watchdog(bot: Bot):
+    """Следит за состоянием вебхука и переустанавливает при ошибках"""
+    webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook"
+    while True:
+        await asyncio.sleep(300)  # 5 минут
+        try:
+            info = await bot.get_webhook_info()
+            if not info.url or info.last_error_date:
+                logger.warning("⚠️ Вебхук проблемный, переустанавливаю...")
+                await bot.delete_webhook(drop_pending_updates=True)
+                await bot.set_webhook(webhook_url)
+                logger.info("✅ Вебхук переустановлен")
+        except Exception as e:
+            logger.error(f"Ошибка watchdog: {e}")
+
 
 # === ПОДКЛЮЧЕНИЕ ВСЕХ РОУТЕРОВ ОДИН РАЗ ===
 from bots.subscription_bot import router as subscription_router
@@ -169,6 +191,7 @@ dp.include_router(subscription_router)
 dp.include_router(info_router)
 dp.include_router(content_router)
 
+
 # === ВЕБХУКИ И HEALTH CHECK ===
 async def health_check(request):
     """Health check для мониторинга"""
@@ -176,12 +199,12 @@ async def health_check(request):
 
 
 async def on_startup(app):
-    # 1. Генерируем секретный токен (случайная строка)
-    import secrets
+    """Действия при запуске"""
+    # 1. Генерируем секретный токен
     secret_token = secrets.token_urlsafe(32)
-    os.environ["WEBHOOK_SECRET"] = secret_token  # сохраним для логов
+    os.environ["WEBHOOK_SECRET"] = secret_token
 
-    # 2. Удаляем старый вебхук со сбросом апдейтов
+    # 2. Удаляем старый вебхук
     await bot.delete_webhook(drop_pending_updates=True)
     logger.info("✅ Старый вебхук удалён, апдейты сброшены")
 
@@ -196,17 +219,15 @@ async def on_startup(app):
     logger.info(f"✅ Webhook установлен: {webhook_url}")
     logger.info(f"🔐 Secret token: {secret_token[:10]}... (усечён)")
 
-    # 4. Подробная диагностика
+    # 4. Диагностика вебхука
     webhook_info = await bot.get_webhook_info()
     logger.info(f"📡 Webhook URL: {webhook_info.url}")
-    logger.info(f"🔒 Has secret token: {'да' if webhook_info.secret_token else 'нет'}")
     logger.info(f"📦 Pending updates: {webhook_info.pending_update_count}")
     logger.info(f"🕒 Last error date: {webhook_info.last_error_date}")
     logger.info(f"❌ Last error message: {webhook_info.last_error_message}")
     logger.info(f"🔗 Max connections: {webhook_info.max_connections}")
-    logger.info(f"📋 Allowed updates: {webhook_info.allowed_updates}")
 
-    # 4. Проверка переменной Google (опционально)
+    # 5. Проверка Google Credentials
     b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
     if b64:
         logger.info(f"✅ GOOGLE_CREDENTIALS_BASE64 найдена, длина={len(b64)}")
@@ -215,15 +236,30 @@ async def on_startup(app):
     else:
         logger.error("❌ GOOGLE_CREDENTIALS_BASE64 НЕ НАЙДЕНА!")
 
-    # 5. Запускаем self-ping (у тебя уже определена выше)
-    asyncio.create_task(self_ping())
+    # 6. Создаём клиентскую сессию для self-ping (будет жить всё время приложения)
+    app['client_session'] = aiohttp.ClientSession()
+
+    # 7. Запускаем self-ping с этой сессией
+    asyncio.create_task(self_ping(app['client_session']))
     logger.info("🔄 Self-ping запущен")
+
+    # 8. Запускаем watchdog вебхука
+    asyncio.create_task(webhook_watchdog(bot))
+    logger.info("🔄 Webhook watchdog запущен")
 
 
 async def on_shutdown(app):
     """Действия при остановке"""
     await bot.delete_webhook()
+    logger.info("Вебхук удалён при остановке")
+
+    # Закрываем сессию aiohttp
+    if 'client_session' in app:
+        await app['client_session'].close()
+        logger.info("✅ Клиентская сессия закрыта")
+
     logger.info("Бот остановлен")
+
 
 def main():
     """Запуск сервера"""
@@ -245,6 +281,7 @@ def main():
     port = int(os.getenv("PORT", 8080))
     logger.info(f"Сервер запущен на порту {port}")
     web.run_app(app, host="0.0.0.0", port=port)
+
 
 if __name__ == "__main__":
     main()
